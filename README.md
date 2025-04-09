@@ -7,6 +7,7 @@ Fabric-CarbonTrade is a demo carbon trading platform built on Hyperledger Fabric
 ## Roles
   - **Regulators**: Oversee the platform, authorize CCT minting, and manage the stablecoin (STABLE).
   - **Enterprises**: Mint CCT based on verified green activities, provide liquidity, and trade CCT.
+  
   ## Features
 - **CarbonCoinToken (CCT)**:
   - An ERC-20 compliant token representing carbon credits, minted by enterprises with regulator approval.
