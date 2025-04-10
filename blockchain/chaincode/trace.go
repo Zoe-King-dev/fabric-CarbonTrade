@@ -8,16 +8,18 @@ import (
 	"log"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
-	"github.com/hyperledger/fabric-samples/asset-transfer-basic/chaincode-go/chaincode"
+	"fabric-CarbonTrade/chaincode/chaincode"
 )
 
 func main() {
-	assetChaincode, err := contractapi.NewChaincode(&chaincode.SmartContract{})
+	// 創建組合 chaincode
+	cc, err := contractapi.NewChaincode(&chaincode.CarbonCoinToken{}, &chaincode.Exchange{})
 	if err != nil {
-		log.Panicf("Error creating trace chaincode: %v", err)
+		log.Panicf("Error creating combined chaincode: %v", err)
 	}
 
-	if err := assetChaincode.Start(); err != nil {
-		log.Panicf("Error starting trace chaincode: %v", err)
+	// 啟動 chaincode
+	if err := cc.Start(); err != nil {
+		log.Panicf("Error starting chaincode: %v", err)
 	}
 }

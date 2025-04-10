@@ -1,5 +1,6 @@
 import Vue from 'vue'
 import Router from 'vue-router'
+import DexExchange from '../views/exchange/DexExchange.vue'
 
 Vue.use(Router)
 
@@ -181,6 +182,16 @@ export const constantRoutes = [
       component: () => import('@/views/build/index'),
       meta: { title: '构建任意溯源系统', icon: 'el-icon-s-tools' }
     }]
+  },
+
+  {
+    path: '/dex',
+    name: 'DexExchange',
+    component: DexExchange,
+    meta: {
+      title: 'Carbon Trade DEX',
+      requiresAuth: true
+    }
   },
 
   // 404 page must be placed at the end !!!

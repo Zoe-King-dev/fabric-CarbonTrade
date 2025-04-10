@@ -1,23 +1,13 @@
 package controller
 
 import (
+	"backend/pkg"
 	"fmt"
 	"math/big"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 )
-
-type ExchangeController struct {
-	fabricClient *channel.Client
-}
-
-func NewExchangeController(fabricClient *channel.Client) *ExchangeController {
-	return &ExchangeController{
-		fabricClient: fabricClient,
-	}
-}
 
 type LiquidityRequest struct {
 	AmountETH       string  `json:"amountEth"`
@@ -30,7 +20,7 @@ type SwapRequest struct {
 }
 
 // AddLiquidity handles adding liquidity to the pool
-func (e *ExchangeController) AddLiquidity(c *gin.Context) {
+func AddLiquidity(c *gin.Context) {
 	var req LiquidityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -45,12 +35,7 @@ func (e *ExchangeController) AddLiquidity(c *gin.Context) {
 	}
 
 	// Call chaincode
-	response, err := e.fabricClient.Execute(channel.Request{
-		ChaincodeID: "exchange",
-		Fcn:         "AddLiquidity",
-		Args:        [][]byte{[]byte(req.AmountETH)},
-	})
-
+	res, err := pkg.ChaincodeInvoke("AddLiquidity", []string{req.AmountETH})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to add liquidity: %v", err)})
 		return
@@ -58,12 +43,12 @@ func (e *ExchangeController) AddLiquidity(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"txId":   response.TransactionID,
+		"txId":   res,
 	})
 }
 
 // RemoveLiquidity handles removing liquidity from the pool
-func (e *ExchangeController) RemoveLiquidity(c *gin.Context) {
+func RemoveLiquidity(c *gin.Context) {
 	var req LiquidityRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -77,11 +62,7 @@ func (e *ExchangeController) RemoveLiquidity(c *gin.Context) {
 	}
 
 	// Call chaincode
-	response, err := e.fabricClient.Execute(channel.Request{
-		ChaincodeID: "exchange",
-		Fcn:         "RemoveLiquidity",
-		Args:        [][]byte{[]byte(req.AmountETH)},
-	})
+	response, err := pkg.ChaincodeInvoke("RemoveLiquidity", []string{req.AmountETH})
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to remove liquidity: %v", err)})
@@ -90,12 +71,12 @@ func (e *ExchangeController) RemoveLiquidity(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"txId":   response.TransactionID,
+		"txId":   response,
 	})
 }
 
 // RemoveAllLiquidity handles removing all liquidity from the pool
-func (e *ExchangeController) RemoveAllLiquidity(c *gin.Context) {
+func RemoveAllLiquidity(c *gin.Context) {
 	var req struct {
 		MaxSlippagePct float64 `json:"maxSlippagePct"`
 	}
@@ -111,11 +92,7 @@ func (e *ExchangeController) RemoveAllLiquidity(c *gin.Context) {
 	}
 
 	// Call chaincode
-	response, err := e.fabricClient.Execute(channel.Request{
-		ChaincodeID: "exchange",
-		Fcn:         "RemoveAllLiquidity",
-		Args:        [][]byte{},
-	})
+	response, err := pkg.ChaincodeInvoke("RemoveAllLiquidity", []string{})
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to remove all liquidity: %v", err)})
@@ -124,12 +101,12 @@ func (e *ExchangeController) RemoveAllLiquidity(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
-		"txId":   response.TransactionID,
+		"txId":   response,
 	})
 }
 
 // SwapTokensForETH handles token to ETH swaps
-func (e *ExchangeController) SwapTokensForETH(c *gin.Context) {
+func SwapTokensForETH(c *gin.Context) {
 	var req SwapRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -149,11 +126,7 @@ func (e *ExchangeController) SwapTokensForETH(c *gin.Context) {
 	}
 
 	// Call chaincode
-	response, err := e.fabricClient.Execute(channel.Request{
-		ChaincodeID: "exchange",
-		Fcn:         "SwapTokensForETH",
-		Args:        [][]byte{[]byte(req.Amount)},
-	})
+	response, err := pkg.ChaincodeInvoke("SwapTokensForETH", []string{req.Amount})
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to swap tokens for ETH: %v", err)})
@@ -161,14 +134,14 @@ func (e *ExchangeController) SwapTokensForETH(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"txId":   response.TransactionID,
-		"ethAmount": string(response.Payload),
+		"status":    "success",
+		"txId":      response,
+		"ethAmount": string(response),
 	})
 }
 
 // SwapETHForTokens handles ETH to token swaps
-func (e *ExchangeController) SwapETHForTokens(c *gin.Context) {
+func SwapETHForTokens(c *gin.Context) {
 	var req SwapRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -188,11 +161,7 @@ func (e *ExchangeController) SwapETHForTokens(c *gin.Context) {
 	}
 
 	// Call chaincode
-	response, err := e.fabricClient.Execute(channel.Request{
-		ChaincodeID: "exchange",
-		Fcn:         "SwapETHForTokens",
-		Args:        [][]byte{[]byte(req.Amount)},
-	})
+	response, err := pkg.ChaincodeInvoke("SwapETHForTokens", []string{req.Amount})
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to swap ETH for tokens: %v", err)})
@@ -200,8 +169,8 @@ func (e *ExchangeController) SwapETHForTokens(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"txId":   response.TransactionID,
-		"tokenAmount": string(response.Payload),
+		"status":      "success",
+		"txId":        response,
+		"tokenAmount": string(response),
 	})
 }

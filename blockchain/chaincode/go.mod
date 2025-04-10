@@ -1,4 +1,4 @@
-module github.com/hyperledger/fabric-samples/asset-transfer-basic/chaincode-go
+module fabric-CarbonTrade/chaincode
 
 go 1.17
 

@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 )
 
 func SetupRouter() *gin.Engine {
@@ -53,24 +52,34 @@ func SetupRouter() *gin.Engine {
 	r.POST("/getAllFruitInfo", middleware.JWTAuthMiddleware(), con.GetAllFruitInfo)
 	// 获取农产品上链历史(溯源)
 	r.POST("/getFruitHistory", middleware.JWTAuthMiddleware(), con.GetFruitHistory)
+	// 添加流动性
+	r.POST("/liquidity/add", middleware.JWTAuthMiddleware(), con.AddLiquidity)
+	// 移除流动性
+	r.POST("/liquidity/remove", middleware.JWTAuthMiddleware(), con.RemoveLiquidity)
+	// 移除所有流动性
+	r.POST("/liquidity/remove-all", middleware.JWTAuthMiddleware(), con.RemoveAllLiquidity)
+	// 代币换ETH
+	r.POST("/swap/tokens-for-eth", middleware.JWTAuthMiddleware(), con.SwapTokensForETH)
+	// ETH换代币
+	r.POST("/swap/eth-for-tokens", middleware.JWTAuthMiddleware(), con.SwapETHForTokens)
 	return r
 }
 
-func InitRouter(fabricClient *channel.Client) *gin.Engine {
-	r := gin.Default()
+// func InitRouter(contract *gateway.Contract) *gin.Engine {
+// 	r := gin.Default()
 
-	// Create controllers
-	exchangeController := con.NewExchangeController(fabricClient)
+// 	// Create controllers
+// 	exchangeController := con.NewExchangeController(contract)
 
-	// Exchange routes
-	exchange := r.Group("/api/exchange")
-	{
-		exchange.POST("/liquidity/add", exchangeController.AddLiquidity)
-		exchange.POST("/liquidity/remove", exchangeController.RemoveLiquidity)
-		exchange.POST("/liquidity/remove-all", exchangeController.RemoveAllLiquidity)
-		exchange.POST("/swap/tokens-for-eth", exchangeController.SwapTokensForETH)
-		exchange.POST("/swap/eth-for-tokens", exchangeController.SwapETHForTokens)
-	}
+// 	// Exchange routes
+// 	exchange := r.Group("/api/exchange")
+// 	{
+// 		exchange.POST("/liquidity/add", exchangeController.AddLiquidity)
+// 		exchange.POST("/liquidity/remove", exchangeController.RemoveLiquidity)
+// 		exchange.POST("/liquidity/remove-all", exchangeController.RemoveAllLiquidity)
+// 		exchange.POST("/swap/tokens-for-eth", exchangeController.SwapTokensForETH)
+// 		exchange.POST("/swap/eth-for-tokens", exchangeController.SwapETHForTokens)
+// 	}
 
-	return r
-}
+// 	return r
+// }

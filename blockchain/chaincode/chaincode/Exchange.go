@@ -1,4 +1,4 @@
-package main
+package chaincode
 
 import (
 	"encoding/json"
@@ -83,7 +83,11 @@ func (e *Exchange) CreatePool(ctx contractapi.TransactionContextInterface, amoun
 		return fmt.Errorf("pool already initialized")
 	}
 
-	owner := string(ctx.GetStub().GetCreator())
+	creatorBytes, err := ctx.GetStub().GetCreator()
+	if err != nil {
+		return fmt.Errorf("failed to get creator: %v", err)
+	}
+	owner := string(creatorBytes)
 	pool.TokenReserve = amount
 	pool.LiquidityProviders = append(pool.LiquidityProviders, owner)
 	pool.LPShares[owner] = new(big.Int).Set(amount) // 初始份额等于代币数量
@@ -169,24 +173,28 @@ func (e *Exchange) GetReserves(ctx contractapi.TransactionContextInterface) (str
 }
 
 // AddLiquidity 添加流动性
-func (e *Exchange) AddLiquidity(ctx contractapi.TransactionContextInterface, ethAmount string) error {
+func (e *Exchange) AddLiquidity(ctx contractapi.TransactionContextInterface, ethAmount string) (string, error) {
 	eth, ok := new(big.Int).SetString(ethAmount, 10)
 	if !ok || eth.Cmp(big.NewInt(0)) <= 0 {
-		return fmt.Errorf("invalid ethAmount")
+		return "", fmt.Errorf("invalid ethAmount")
 	}
 
 	poolBytes, err := ctx.GetStub().GetState("pool")
 	if err != nil {
-		return fmt.Errorf("failed to read pool: %v", err)
+		return "", fmt.Errorf("failed to read pool: %v", err)
 	}
 
 	var pool Pool
 	err = json.Unmarshal(poolBytes, &pool)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal pool: %v", err)
+		return "", fmt.Errorf("failed to unmarshal pool: %v", err)
 	}
 
-	owner := string(ctx.GetStub().GetCreator())
+	creatorBytes, err := ctx.GetStub().GetCreator()
+	if err != nil {
+		return "", fmt.Errorf("failed to get creator: %v", err)
+	}
+	owner := string(creatorBytes)
 	var tokenAmount *big.Int
 	if pool.TotalShares.Cmp(big.NewInt(0)) == 0 {
 		tokenAmount = eth // 初始情况下，代币数量等于 ETH 数量
@@ -206,39 +214,43 @@ func (e *Exchange) AddLiquidity(ctx contractapi.TransactionContextInterface, eth
 
 	poolBytes, err = json.Marshal(pool)
 	if err != nil {
-		return fmt.Errorf("failed to marshal pool: %v", err)
+		return "", fmt.Errorf("failed to marshal pool: %v", err)
 	}
 
 	err = ctx.GetStub().PutState("pool", poolBytes)
 	if err != nil {
-		return fmt.Errorf("failed to update pool: %v", err)
+		return "", fmt.Errorf("failed to update pool: %v", err)
 	}
 
-	return nil
+	return ctx.GetStub().GetTxID(), nil
 }
 
 // RemoveLiquidity 移除部分流动性
-func (e *Exchange) RemoveLiquidity(ctx contractapi.TransactionContextInterface, amountETH string) error {
+func (e *Exchange) RemoveLiquidity(ctx contractapi.TransactionContextInterface, amountETH string) (string, error) {
 	amount, ok := new(big.Int).SetString(amountETH, 10)
 	if !ok || amount.Cmp(big.NewInt(0)) <= 0 {
-		return fmt.Errorf("invalid amountETH")
+		return "", fmt.Errorf("invalid amountETH")
 	}
 
 	poolBytes, err := ctx.GetStub().GetState("pool")
 	if err != nil {
-		return fmt.Errorf("failed to read pool: %v", err)
+		return "", fmt.Errorf("failed to read pool: %v", err)
 	}
 
 	var pool Pool
 	err = json.Unmarshal(poolBytes, &pool)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal pool: %v", err)
+		return "", fmt.Errorf("failed to unmarshal pool: %v", err)
 	}
 
-	owner := string(ctx.GetStub().GetCreator())
+	creatorBytes, err := ctx.GetStub().GetCreator()
+	if err != nil {
+		return "", fmt.Errorf("failed to get creator: %v", err)
+	}
+	owner := string(creatorBytes)
 	lpShare := pool.LPShares[owner]
 	if lpShare == nil || lpShare.Cmp(amount) < 0 {
-		return fmt.Errorf("insufficient liquidity")
+		return "", fmt.Errorf("insufficient liquidity")
 	}
 
 	ethShare := new(big.Int).Mul(amount, pool.ETHReserve)
@@ -253,46 +265,24 @@ func (e *Exchange) RemoveLiquidity(ctx contractapi.TransactionContextInterface, 
 
 	poolBytes, err = json.Marshal(pool)
 	if err != nil {
-		return fmt.Errorf("failed to marshal pool: %v", err)
+		return "", fmt.Errorf("failed to marshal pool: %v", err)
 	}
 
 	err = ctx.GetStub().PutState("pool", poolBytes)
 	if err != nil {
-		return fmt.Errorf("failed to update pool: %v", err)
+		return "", fmt.Errorf("failed to update pool: %v", err)
 	}
 
-	return nil
+	return ctx.GetStub().GetTxID(), nil
 }
 
 // RemoveAllLiquidity 移除所有流动性
-func (e *Exchange) RemoveAllLiquidity(ctx contractapi.TransactionContextInterface) error {
-	owner := string(ctx.GetStub().GetCreator())
-	poolBytes, err := ctx.GetStub().GetState("pool")
+func (e *Exchange) RemoveAllLiquidity(ctx contractapi.TransactionContextInterface) (string, error) {
+	creatorBytes, err := ctx.GetStub().GetCreator()
 	if err != nil {
-		return fmt.Errorf("failed to read pool: %v", err)
+		return "", fmt.Errorf("failed to get creator: %v", err)
 	}
-
-	var pool Pool
-	err = json.Unmarshal(poolBytes, &pool)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal pool: %v", err)
-	}
-
-	lpShare := pool.LPShares[owner]
-	if lpShare == nil {
-		return fmt.Errorf("no liquidity to remove")
-	}
-
-	return e.RemoveLiquidity(ctx, lpShare.String())
-}
-
-// SwapTokensForETH 将代币换成 ETH
-func (e *Exchange) SwapTokensForETH(ctx contractapi.TransactionContextInterface, amountTokens string) (string, error) {
-	amount, ok := new(big.Int).SetString(amountTokens, 10)
-	if !ok || amount.Cmp(big.NewInt(0)) <= 0 {
-		return "", fmt.Errorf("amount must be greater than 0")
-	}
-
+	owner := string(creatorBytes)
 	poolBytes, err := ctx.GetStub().GetState("pool")
 	if err != nil {
 		return "", fmt.Errorf("failed to read pool: %v", err)
@@ -302,6 +292,32 @@ func (e *Exchange) SwapTokensForETH(ctx contractapi.TransactionContextInterface,
 	err = json.Unmarshal(poolBytes, &pool)
 	if err != nil {
 		return "", fmt.Errorf("failed to unmarshal pool: %v", err)
+	}
+
+	lpShare := pool.LPShares[owner]
+	if lpShare == nil {
+		return "", fmt.Errorf("no liquidity to remove")
+	}
+
+	return e.RemoveLiquidity(ctx, lpShare.String())
+}
+
+// SwapTokensForETH 将代币换成 ETH
+func (e *Exchange) SwapTokensForETH(ctx contractapi.TransactionContextInterface, amountTokens string) (string, string, error) {
+	amount, ok := new(big.Int).SetString(amountTokens, 10)
+	if !ok || amount.Cmp(big.NewInt(0)) <= 0 {
+		return "", "", fmt.Errorf("amount must be greater than 0")
+	}
+
+	poolBytes, err := ctx.GetStub().GetState("pool")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read pool: %v", err)
+	}
+
+	var pool Pool
+	err = json.Unmarshal(poolBytes, &pool)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to unmarshal pool: %v", err)
 	}
 
 	// 计算交易费用（从输入的 amountTokens 中扣除）
@@ -320,33 +336,33 @@ func (e *Exchange) SwapTokensForETH(ctx contractapi.TransactionContextInterface,
 
 	poolBytes, err = json.Marshal(pool)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal pool: %v", err)
+		return "", "", fmt.Errorf("failed to marshal pool: %v", err)
 	}
 
 	err = ctx.GetStub().PutState("pool", poolBytes)
 	if err != nil {
-		return "", fmt.Errorf("failed to update pool: %v", err)
+		return "", "", fmt.Errorf("failed to update pool: %v", err)
 	}
 
-	return amountETH.String(), nil
+	return ctx.GetStub().GetTxID(), amountETH.String(), nil
 }
 
 // SwapETHForTokens 将 ETH 换成代币
-func (e *Exchange) SwapETHForTokens(ctx contractapi.TransactionContextInterface, ethAmount string) (string, error) {
+func (e *Exchange) SwapETHForTokens(ctx contractapi.TransactionContextInterface, ethAmount string) (string, string, error) {
 	amount, ok := new(big.Int).SetString(ethAmount, 10)
 	if !ok || amount.Cmp(big.NewInt(0)) <= 0 {
-		return "", fmt.Errorf("amount must be greater than 0")
+		return "", "", fmt.Errorf("amount must be greater than 0")
 	}
 
 	poolBytes, err := ctx.GetStub().GetState("pool")
 	if err != nil {
-		return "", fmt.Errorf("failed to read pool: %v", err)
+		return "", "", fmt.Errorf("failed to read pool: %v", err)
 	}
 
 	var pool Pool
 	err = json.Unmarshal(poolBytes, &pool)
 	if err != nil {
-		return "", fmt.Errorf("failed to unmarshal pool: %v", err)
+		return "", "", fmt.Errorf("failed to unmarshal pool: %v", err)
 	}
 
 	// 计算交易费用（从输入的 ethAmount 中扣除）
@@ -365,25 +381,13 @@ func (e *Exchange) SwapETHForTokens(ctx contractapi.TransactionContextInterface,
 
 	poolBytes, err = json.Marshal(pool)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal pool: %v", err)
+		return "", "", fmt.Errorf("failed to marshal pool: %v", err)
 	}
 
 	err = ctx.GetStub().PutState("pool", poolBytes)
 	if err != nil {
-		return "", fmt.Errorf("failed to update pool: %v", err)
+		return "", "", fmt.Errorf("failed to update pool: %v", err)
 	}
 
-	return amountTokens.String(), nil
-}
-
-func main() {
-	chaincode, err := contractapi.NewChaincode(new(Exchange))
-	if err != nil {
-		fmt.Printf("Error creating Exchange chaincode: %v", err)
-		return
-	}
-
-	if err := chaincode.Start(); err != nil {
-		fmt.Printf("Error starting Exchange chaincode: %v", err)
-	}
+	return ctx.GetStub().GetTxID(), amountTokens.String(), nil
 }
