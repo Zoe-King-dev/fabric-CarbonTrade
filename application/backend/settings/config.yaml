@@ -1,11 +1,11 @@
 app:
-  name: "fabricTraceServer"
+  name: "fabricCarbonTradeServer"
   mode: "dev"
   port: 9090
   salt: "testsalt"
 jwt:
   secret: "testsecret"
-  issuer: "fabricTraceServer"
+  issuer: "fabricCarbonTradeServer"
 mysql:
   host: "127.0.0.1"
   port: 3337
@@ -13,6 +13,41 @@ mysql:
   password : "fabrictrace"
   charset: "utf8mb4"
   db : "fabrictrace"
+
+fabric:
+  network:
+    name: "fabric-carbontrade-network"
+    version: 1.0.0
+  client:
+    organization: Org1
+    logging:
+      level: info
+    cryptoconfig:
+      path: ${GOPATH}/src/github.com/hyperledger/fabric-samples/test-network/organizations
+  channels:
+    mychannel:
+      peers:
+        peer0.org1.example.com:
+          endorsingPeer: true
+          chaincodeQuery: true
+          ledgerQuery: true
+          eventSource: true
+  organizations:
+    Org1:
+      mspid: Org1MSP
+      cryptoPath: peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+      peers:
+        - peer0.org1.example.com
+  orderers:
+    orderer.example.com:
+      url: grpcs://localhost:7050
+      tlsCACerts:
+        path: ${GOPATH}/src/github.com/hyperledger/fabric-samples/test-network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+  peers:
+    peer0.org1.example.com:
+      url: grpcs://localhost:7051
+      tlsCACerts:
+        path: ${GOPATH}/src/github.com/hyperledger/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
   
 # mysql:
 #   host: "127.0.0.1"
